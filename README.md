@@ -58,7 +58,7 @@ cargo run -- \
 `docker-compose.yml` defines two image variants:
 
 - `slim` (default service `browser-stream`): uses system `chromium` + `ffmpeg` packages in the container.
-- `full` (service `browser-stream-full`): bundles sidecar binaries in image at `/opt/sidecar/...`.
+- `full` (service `browser-stream-full`): bundles Chromium sidecar at `/opt/sidecar/chromium/...` and uses distro `ffmpeg`.
 
 Build and run `slim` (default):
 
@@ -107,7 +107,7 @@ VERBOSE=0
 Binary resolution in containers:
 
 - `slim`: auto-detects system `chromium`/`chromium-browser` and `ffmpeg`.
-- `full`: uses bundled sidecars via `BROWSER_STREAM_CHROMIUM_PATH` and `BROWSER_STREAM_FFMPEG_PATH`.
+- `full`: uses bundled Chromium sidecar via `BROWSER_STREAM_CHROMIUM_PATH` and system `ffmpeg` via `BROWSER_STREAM_FFMPEG_PATH=/usr/bin/ffmpeg`.
 
 No sidecar downloads are required for either image.
 Both images set `BROWSER_STREAM_NO_SANDBOX=1` for Chromium compatibility in containers.

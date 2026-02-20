@@ -21,7 +21,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 RUN set -eu; \
-  mkdir -p /out/sidecar/chromium /out/sidecar/ffmpeg; \
+  mkdir -p /out/sidecar/chromium; \
   chromium_manifest_url="https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"; \
   chromium_url="$(curl -fsSL "${chromium_manifest_url}" | jq -r '.channels.Stable.downloads["chrome-headless-shell"][] | select(.platform == "linux64") | .url')"; \
   test -n "${chromium_url}" && test "${chromium_url}" != "null"; \
@@ -32,14 +32,7 @@ RUN set -eu; \
   chromium_root="$(dirname "${chromium_source}")"; \
   cp -R "${chromium_root}"/. /out/sidecar/chromium/; \
   cp "${chromium_source}" /out/sidecar/chromium/headless_shell; \
-  chmod +x /out/sidecar/chromium/headless_shell; \
-  ffmpeg_url="https://ffmpeg.martin-riedl.de/redirect/latest/linux/amd64/release/ffmpeg.zip"; \
-  curl -fL "${ffmpeg_url}" -o /tmp/ffmpeg.zip; \
-  unzip -q /tmp/ffmpeg.zip -d /tmp/ffmpeg; \
-  ffmpeg_source="$(find /tmp/ffmpeg -type f -name ffmpeg | head -n 1)"; \
-  test -n "${ffmpeg_source}"; \
-  cp "${ffmpeg_source}" /out/sidecar/ffmpeg/ffmpeg; \
-  chmod +x /out/sidecar/ffmpeg/ffmpeg
+  chmod +x /out/sidecar/chromium/headless_shell
 
 FROM debian:bookworm-slim AS runtime-base
 WORKDIR /app
@@ -94,10 +87,14 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 FROM runtime-base AS full
 COPY --from=sidecar-fetch /out/sidecar /opt/sidecar
-RUN chown -R browserstream:browserstream /opt/sidecar
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ffmpeg \
+  && rm -rf /var/lib/apt/lists/* \
+  && chown -R browserstream:browserstream /opt/sidecar
 
 ENV BROWSER_STREAM_CHROMIUM_PATH=/opt/sidecar/chromium/headless_shell
-ENV BROWSER_STREAM_FFMPEG_PATH=/opt/sidecar/ffmpeg/ffmpeg
+ENV BROWSER_STREAM_FFMPEG_PATH=/usr/bin/ffmpeg
 
 USER browserstream
 
