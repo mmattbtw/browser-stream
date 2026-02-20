@@ -1,0 +1,42 @@
+x-browser-stream-env: &browser-stream-env
+  WEBSITE_URL: ${WEBSITE_URL:-https://example.com}
+  OUTPUT: ${OUTPUT:-}
+  RTMP_URL: ${RTMP_URL:-rtmp://live.example.com/app}
+  STREAM_KEY: ${STREAM_KEY:-changeme}
+  WIDTH: ${WIDTH:-1920}
+  HEIGHT: ${HEIGHT:-1080}
+  FPS: ${FPS:-30}
+  BITRATE_KBPS: ${BITRATE_KBPS:-4500}
+  KEYINT_SEC: ${KEYINT_SEC:-1}
+  X264_OPTS: ${X264_OPTS:-bframes=0}
+  RETRIES: ${RETRIES:-5}
+  RETRY_BACKOFF_MS: ${RETRY_BACKOFF_MS:-1000}
+  STARTUP_DELAY_MS: ${STARTUP_DELAY_MS:-2000}
+  FRAME_TIMEOUT_MS: ${FRAME_TIMEOUT_MS:-30000}
+  NO_AUDIO: ${NO_AUDIO:-0}
+  VERBOSE: ${VERBOSE:-0}
+
+x-browser-stream-common: &browser-stream-common
+  restart: unless-stopped
+  environment: *browser-stream-env
+  stdin_open: true
+  tty: true
+
+services:
+  browser-stream:
+    <<: *browser-stream-common
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: slim
+    image: browser-stream:slim
+
+  browser-stream-full:
+    <<: *browser-stream-common
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: full
+    image: browser-stream:full
+    profiles:
+      - full

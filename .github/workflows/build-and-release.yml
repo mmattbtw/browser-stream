@@ -1,0 +1,109 @@
+name: Build and Release
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            os: macos-14
+            target: aarch64-apple-darwin
+            artifact_id: macos-arm64
+            archive_ext: tar.gz
+            bin_name: browser-stream
+          - name: Linux x86_64
+            os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            artifact_id: linux-x86_64
+            archive_ext: tar.gz
+            bin_name: browser-stream
+          - name: Windows x86_64
+            os: windows-2022
+            target: x86_64-pc-windows-msvc
+            artifact_id: windows-x86_64
+            archive_ext: zip
+            bin_name: browser-stream.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Install sidecar tooling (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq unzip
+
+      - name: Install sidecar tooling (macOS)
+        if: runner.os == 'macOS'
+        run: brew install jq unzip
+
+      - name: Fetch sidecars (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: ./scripts/fetch-sidecars.sh --destination dist/sidecar
+
+      - name: Fetch sidecars (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/fetch-sidecars.ps1 -Destination dist/sidecar
+
+      - name: Package archive (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: |
+          set -euo pipefail
+          ARCHIVE_ROOT="browser-stream-${{ matrix.artifact_id }}"
+          PACKAGE_ROOT="dist/${ARCHIVE_ROOT}"
+
+          mkdir -p "$PACKAGE_ROOT/bin" "$PACKAGE_ROOT/sidecar"
+          cp "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" "$PACKAGE_ROOT/bin/${{ matrix.bin_name }}"
+          cp -R dist/sidecar/. "$PACKAGE_ROOT/sidecar/"
+
+          tar -czf "dist/${ARCHIVE_ROOT}.tar.gz" -C dist "${ARCHIVE_ROOT}"
+
+      - name: Package archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $archiveRoot = "browser-stream-${{ matrix.artifact_id }}"
+          $packageRoot = "dist/$archiveRoot"
+
+          New-Item -ItemType Directory -Force -Path "$packageRoot/bin" | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" "$packageRoot/bin/${{ matrix.bin_name }}" -Force
+          Copy-Item "dist/sidecar" "$packageRoot/sidecar" -Recurse -Force
+
+          Compress-Archive -Path $packageRoot -DestinationPath "dist/$archiveRoot.zip" -Force
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-stream-${{ matrix.artifact_id }}
+          path: dist/browser-stream-${{ matrix.artifact_id }}.${{ matrix.archive_ext }}
+
+      - name: Publish release asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/browser-stream-${{ matrix.artifact_id }}.${{ matrix.archive_ext }}
