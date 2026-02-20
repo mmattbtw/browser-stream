@@ -20,7 +20,7 @@ RUN apt-get update \
     unzip \
   && rm -rf /var/lib/apt/lists/*
 
-RUN set -euo pipefail; \
+RUN set -eu; \
   mkdir -p /out/sidecar/chromium /out/sidecar/ffmpeg; \
   chromium_manifest_url="https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json"; \
   chromium_url="$(curl -fsSL "${chromium_manifest_url}" | jq -r '.channels.Stable.downloads["chrome-headless-shell"][] | select(.platform == "linux64") | .url')"; \
